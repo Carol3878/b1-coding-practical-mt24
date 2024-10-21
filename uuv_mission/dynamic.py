@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import numpy as np
 import matplotlib.pyplot as plt
 from .terrain import generate_reference_and_limits
+import pandas as pd
+from .controller import PDController
 
 class Submarine:
     def __init__(self):
@@ -76,11 +78,17 @@ class Mission:
     @classmethod
     def from_csv(cls, file_name: str):
         # You are required to implement this method
+        data = pd.read_csv(file_name)
+        reference = data["reference"].to_numpy()
+        cave_height = data["cave_height"].to_numpy()
+        cave_depth = data["cave_depth"].to_numpy()
+
+        return cls(reference, cave_height, cave_depth)
         pass
 
 
 class ClosedLoop:
-    def __init__(self, plant: Submarine, controller):
+    def __init__(self, plant: Submarine, controller: PDController):
         self.plant = plant
         self.controller = controller
 
@@ -93,11 +101,15 @@ class ClosedLoop:
         positions = np.zeros((T, 2))
         actions = np.zeros(T)
         self.plant.reset_state()
+        # self.controller.reset()
 
         for t in range(T):
             positions[t] = self.plant.get_position()
             observation_t = self.plant.get_depth()
+            reference_t = mission.reference[t]
             # Call your controller here
+            action = self.controller.compute_control_action(reference_t, observation_t)
+            actions[t] = action
             self.plant.transition(actions[t], disturbances[t])
 
         return Trajectory(positions)
@@ -105,3 +117,13 @@ class ClosedLoop:
     def simulate_with_random_disturbances(self, mission: Mission, variance: float = 0.5) -> Trajectory:
         disturbances = np.random.normal(0, variance, len(mission.reference))
         return self.simulate(mission, disturbances)
+
+# sub = Submarine()
+# # Instantiate your controller (depending on your implementation)
+# controller = PDController(KP=0.15, KD=0.6)
+
+# closed_loop = ClosedLoop(sub, controller)
+# mission = Mission.from_csv("/Users/carol.c/Desktop/大学/Oxford/大三/B1/b1-coding-practical-mt24-main/data/mission.csv") # You must implement this method in the Mission class
+
+# trajectory = closed_loop.simulate_with_random_disturbances(mission)
+# trajectory.plot_completed_mission(mission)
